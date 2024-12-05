@@ -20,18 +20,7 @@ func main() {
 	reader := bytes.NewReader(text)
 
 	grid1 := buildGrid(reader)
-
-	fmt.Println("")
-	fmt.Println("Parsed grid:")
-	fmt.Println("")
-	grid1.Print(false)
-
 	part1Total := totalForGrid(grid1, 1)
-
-	fmt.Println("")
-	fmt.Println("Matches:")
-	fmt.Println("")
-	grid1.Print(true)
 
 	_, err = reader.Seek(0, io.SeekStart)
 
@@ -39,15 +28,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	reader = bytes.NewReader(text)
 	grid2 := buildGrid(reader)
-
 	part2Total := totalForGrid(grid2, 2)
-
-	fmt.Println("")
-	fmt.Println("Matches:")
-	fmt.Println("")
-	grid2.Print(true)
 
 	fmt.Println("")
 	fmt.Println("Total (Part 1):")
@@ -72,111 +54,6 @@ func (g *Grid) First() (*GridNode, error) {
 	return &GridNode{}, &noNodeError{"grid does not have a first node"}
 }
 
-func (g *Grid) Print(onlyMatches bool) {
-	first, err := g.First()
-
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "grid is empty")
-	}
-
-	current, currentLineFirst := first, first
-
-	for {
-		if onlyMatches && !current.IsInMatch {
-			fmt.Print(".")
-		} else {
-			fmt.Print(current.Value)
-		}
-
-		east, err := current.E()
-
-		if err == nil {
-			// There's an east, keep going east on this line
-			current = east
-		} else {
-			// There's no east, go to the next line
-			fmt.Print("\n")
-
-			nextLineFirst, err := currentLineFirst.S()
-
-			if err != nil {
-				break
-			}
-
-			currentLineFirst = nextLineFirst
-			current = nextLineFirst
-		}
-	}
-
-	fmt.Print("\n")
-}
-
-func (g *GridNode) PrintNeighbourhood() {
-	dir, err := g.NW()
-	if err == nil {
-		fmt.Print(dir.Value)
-	} else {
-		fmt.Print("-")
-	}
-
-	dir, err = g.N()
-	if err == nil {
-		fmt.Print(dir.Value)
-	} else {
-		fmt.Print("-")
-	}
-
-	dir, err = g.NE()
-	if err == nil {
-		fmt.Print(dir.Value)
-	} else {
-		fmt.Print("-")
-	}
-
-	fmt.Print("\n")
-
-	dir, err = g.W()
-	if err == nil {
-		fmt.Print(dir.Value)
-	} else {
-		fmt.Print("-")
-	}
-
-	fmt.Print(g.Value)
-
-	dir, err = g.E()
-	if err == nil {
-		fmt.Print(dir.Value)
-	} else {
-		fmt.Print("-")
-	}
-
-	fmt.Print("\n")
-
-	dir, err = g.SW()
-	if err == nil {
-		fmt.Print(dir.Value)
-	} else {
-		fmt.Print("-")
-	}
-
-	dir, err = g.S()
-	if err == nil {
-		fmt.Print(dir.Value)
-	} else {
-		fmt.Print("-")
-	}
-
-	dir, err = g.SW()
-	if err == nil {
-		fmt.Print(dir.Value)
-	} else {
-		fmt.Print("-")
-	}
-
-	fmt.Print("\n")
-}
-
 type GridNode struct {
 	Value     string
 	NorthNode *GridNode
@@ -195,6 +72,7 @@ func (e *noNodeError) Error() string {
 }
 
 func (gn *GridNode) NeighbourInDirection(direction string) (*GridNode, error) {
+	// NOTE: reflection *seems* like a good idea, but I really hate this
 	directionMeth := reflect.ValueOf(gn).MethodByName(direction)
 
 	result := directionMeth.Call([]reflect.Value{})
@@ -226,7 +104,6 @@ func (gn *GridNode) NeighbourInOppositeDirection(direction string) (*GridNode, e
 	oppositeIndex := ((dirIndex-(numDirections/2))%numDirections + numDirections) % numDirections
 	oppositeDirection = directions[oppositeIndex]
 
-	fmt.Printf("direction: %v, opposite: %v\n", direction, oppositeDirection)
 	return gn.NeighbourInDirection(oppositeDirection)
 }
 
@@ -238,13 +115,9 @@ func (gn *GridNode) matchesForNodePart1() int {
 	total := 0
 	letters := []string{"M", "A", "S"}
 
-	// fmt.Printf("The node: %+v\n", *gn)
-
 	// If Value is "X",
 	// this node might be the start of one or more matches
 	for _, direction := range directions {
-		// fmt.Println(direction)
-
 		node, err := gn.NeighbourInDirection(direction)
 
 		if err != nil {
@@ -254,35 +127,22 @@ func (gn *GridNode) matchesForNodePart1() int {
 		matchComponents := []*GridNode{gn}
 
 		for i := 0; i < len(letters); i++ {
-			// fmt.Println("Neighbourhood:")
-			// node.PrintNeighbourhood()
-
 			testLetter := letters[i]
 
-			// fmt.Printf("%+v\n", node)
-
-			// fmt.Printf("Value: %v, testLetter: %v\n", node.Value, testLetter)
-
 			if node.Value != testLetter {
-				// fmt.Println("No match")
-
 				break
 			} else if i == len(letters)-1 {
 				matchComponents = append(matchComponents, node)
 
 				for _, matchNode := range matchComponents {
-					// fmt.Println("Marking true!")
 					matchNode.IsInMatch = true
-					// fmt.Printf("%+v\n", matchNode)
 				}
 
 				total++
 			} else {
-				//fmt.Println("Letter matches. On to the next...")
 				nextNode, err := node.NeighbourInDirection(direction)
 
 				if err != nil {
-					//fmt.Println("No match found in the same direction. :(")
 					break
 				}
 
@@ -304,10 +164,8 @@ func (gn *GridNode) matchesForNodePart2() int {
 	directions := []string{"NE", "SE", "SW", "NW"}
 	matchCorners := []*GridNode{}
 
-	// fmt.Printf("The node: %+v\n", *gn)
-
-	// If Value is "X",
-	// this node might be the start of one or more matches
+	// If Value is "A",
+	// this node might be at the center of a match
 	for _, direction := range directions {
 		for _, match := range matchCorners {
 			oppositeNode, err := gn.NeighbourInOppositeDirection(direction)
@@ -324,8 +182,6 @@ func (gn *GridNode) matchesForNodePart2() int {
 
 		matchComponents := []*GridNode{}
 
-		// fmt.Println(direction)
-
 		node, err := gn.NeighbourInDirection(direction)
 
 		if err != nil {
@@ -335,43 +191,32 @@ func (gn *GridNode) matchesForNodePart2() int {
 		testLetter := "M"
 
 		if node.Value != testLetter {
-			// fmt.Println("No match")
-
 			continue
 		}
 
 		matchComponents = append(matchComponents, node)
 
-		//fmt.Println("Letter matches. On to the next...")
 		node, err = gn.NeighbourInOppositeDirection(direction)
 
 		if err != nil {
-			//fmt.Println("No match found in the opposite direction. :(")
 			continue
 		}
 
 		testLetter = "S"
 
 		if node.Value != testLetter {
-			// fmt.Println("No match")
 			continue
 		}
 
 		matchComponents = append(matchComponents, node)
 		matchCorners = append(matchCorners, matchComponents...)
-
-		fmt.Printf("\n")
 	}
 
 	if len(matchCorners) == 4 {
 		gn.IsInMatch = true
 
 		for _, matchNode := range matchCorners {
-			fmt.Printf("Match! matchComponents:")
-			fmt.Printf("%v", matchNode.Value)
-			// fmt.Println("Marking true!")
 			matchNode.IsInMatch = true
-			// fmt.Printf("%+v\n", matchNode)
 		}
 
 		total++
@@ -482,6 +327,7 @@ func buildGrid(reader *bytes.Reader) *Grid {
 
 			north, err := current.NE()
 
+			// Errors for control flow... I'm guessing this isn't really the "Go way"?
 			if err == nil {
 				newNode.NorthNode = north
 				north.SouthNode = &newNode
@@ -505,6 +351,7 @@ func totalForGrid(grid *Grid, part int) int {
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "grid is empty")
+		os.Exit(1)
 	}
 
 	current, currentLineFirst := first, first
@@ -543,4 +390,112 @@ func isLineTerminator(r rune) bool {
 		return true
 	}
 	return false
+}
+
+// debugging util
+func (g *Grid) Print(onlyMatches bool) {
+	first, err := g.First()
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "grid is empty")
+		os.Exit(1)
+	}
+
+	current, currentLineFirst := first, first
+
+	for {
+		if onlyMatches && !current.IsInMatch {
+			fmt.Print(".")
+		} else {
+			fmt.Print(current.Value)
+		}
+
+		east, err := current.E()
+
+		if err == nil {
+			// There's an east, keep going east on this line
+			current = east
+		} else {
+			// There's no east, go to the next line
+			fmt.Print("\n")
+
+			nextLineFirst, err := currentLineFirst.S()
+
+			if err != nil {
+				break
+			}
+
+			currentLineFirst = nextLineFirst
+			current = nextLineFirst
+		}
+	}
+
+	fmt.Print("\n")
+}
+
+// debugging util
+func (g *GridNode) PrintNeighbourhood() {
+	dir, err := g.NW()
+	if err == nil {
+		fmt.Print(dir.Value)
+	} else {
+		fmt.Print("-")
+	}
+
+	dir, err = g.N()
+	if err == nil {
+		fmt.Print(dir.Value)
+	} else {
+		fmt.Print("-")
+	}
+
+	dir, err = g.NE()
+	if err == nil {
+		fmt.Print(dir.Value)
+	} else {
+		fmt.Print("-")
+	}
+
+	fmt.Print("\n")
+
+	dir, err = g.W()
+	if err == nil {
+		fmt.Print(dir.Value)
+	} else {
+		fmt.Print("-")
+	}
+
+	fmt.Print(g.Value)
+
+	dir, err = g.E()
+	if err == nil {
+		fmt.Print(dir.Value)
+	} else {
+		fmt.Print("-")
+	}
+
+	fmt.Print("\n")
+
+	dir, err = g.SW()
+	if err == nil {
+		fmt.Print(dir.Value)
+	} else {
+		fmt.Print("-")
+	}
+
+	dir, err = g.S()
+	if err == nil {
+		fmt.Print(dir.Value)
+	} else {
+		fmt.Print("-")
+	}
+
+	dir, err = g.SW()
+	if err == nil {
+		fmt.Print(dir.Value)
+	} else {
+		fmt.Print("-")
+	}
+
+	fmt.Print("\n")
 }
